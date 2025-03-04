@@ -1,0 +1,233 @@
+from openai import OpenAI
+import os
+import json
+from pydantic import BaseModel
+from dataclasses import dataclass, field
+from typing import Optional, Dict, Any
+
+
+class GPT_Module_Params(BaseModel):
+    messages: list
+    max_tokens: int
+    temperature: float
+    model: str
+    frequency_penalty: float
+    presence_penalty: float
+    stop: str
+    top_p: float
+    logit_bias: dict
+    logprobs: bool
+    top_logprobs: int
+    n: int
+    response_format: dict
+    seed: str
+    stream: bool
+    tools: list
+    tool_choice: dict
+    user: str
+
+
+class TextModels:
+
+    latest = "gpt-4-turbo"
+    previous = "gpt-4-turbo-preview"
+    previous1 = "gpt-4-1106-preview"
+
+    legacy = "gpt-4"
+    og = "gpt-4-0314"
+
+    alpha = "gpt-4o-64k-output-alpha"
+
+    hipster = "gpt-4o"
+    hipster_latest = "gpt-4o-2024-08-06"
+    hipster_mini = "gpt-4o-mini"
+
+
+class EmbeddingModels:
+    large = "text-embedding-3-large"
+    small = "text-embedding-3-small"
+    legacy = "text-embedding-ada-002"
+
+
+class Models:
+    text = TextModels
+    moderation = "text-moderation-latest"
+    embedding = EmbeddingModels
+    vision = "gpt-4-vision-preview"
+    images = {
+        "latest": "dalle-3",
+        "legacy": "dalle-2"
+    }
+    audio = {
+        "tts": "tts-1",
+        "ttshd": "tts-1-hd",
+        "whisper": "whisper-1"
+    }
+
+
+@dataclass
+class GPTModule:
+    request_body: Optional[Dict[str, any]] = field(default_factory=dict)
+    model: Optional[str] = None
+    messages: Optional[list] = field(default_factory=list)
+    token_usage: Optional[int] = None
+    max_tokens: Optional[int] = None
+    temperature: Optional[float] = None
+    frequency_penalty: Optional[float] = None
+    presence_penalty: Optional[float] = None
+    stop: Optional[list] = field(default_factory=list)
+    top_p: Optional[float] = None
+    logit_bias: Optional[Dict[str, float]] = field(default_factory=dict)
+    logprobs: Optional[int] = None
+    top_logprobs: Optional[int] = None
+    n: Optional[int] = None
+    response_format: Optional[list] = field(default_factory=list)
+    seed: Optional[int] = None
+    stream: Optional[bool] = None
+    tools: Optional[list] = field(default_factory=list)
+    tool_choice: Optional[Dict[str, any]] = field(default_factory=dict)
+    user: Optional[str] = None
+
+
+def make_req_body(module: GPTModule):
+    request_body = {}
+    for attr in module.__dict__:
+        value = getattr(module, attr)
+        if attr == 'request_body' or value is None:
+            continue
+        if value == [] or value == {} or value == "":
+            continue
+        request_body[attr] = value
+    return request_body
+
+
+@dataclass
+class Generate(GPTModule):
+    def __init__(self):
+        self.model = TextModels.latest
+        self.messages = []
+        self.temperature = 0
+
+    async def generate(self, system_message, prompt, model=TextModels.latest, temperature=0, chat=True):
+        self.model = model
+        self.temperature = temperature
+        self.messages.append({"role": "system", "content": system_message})
+        self.messages.append({"role": "user", "content": prompt})
+        self.request_body = make_req_body(self)
+
+        if (chat):
+            response = await Chat(self.request_body)
+            return response
+
+        else:
+            response_body = await ChatBody(self.request_body)
+            return response_body
+
+    async def continued_response(self, assistant_response, prompt):
+        self.messages.append({"role": "assistant", "content": prompt})
+        self.messages.append({"role": "user", "content": prompt})
+        self.request_body = make_req_body(self)
+
+        response = await Chat(self.request_body)
+        return response
+
+    async def function_call_legacy_structured_output(self, system_message, prompt):
+        self.model = TextModels.previous
+        self.messages.append({"role": "system", "content": system_message})
+        self.messages.append({"role": "user", "content": prompt})
+        self.request_body = make_req_body(self)
+
+        response = await Chat(self.request_body)
+        return response
+
+    def call_function(self, function_response, available_functions):
+        return send_functioncall_args_to_available_functions(function_response, available_functions)
+
+    def ingest_schema(self, name, schema):
+        self.response_format = {
+            "type": "json_schema",
+            "json_schema": {
+                "name": name,
+                "strict": True,
+                "schema": schema
+            }
+        }
+
+    async def structured_output(self, system_message, prompt):
+        # NOTE: Make sure to call ingest_schema before calling this function
+        self.model = TextModels.hipster_latest
+        self.messages.append({"role": "system", "content": system_message})
+        self.messages.append({"role": "user", "content": prompt})
+        self.request_body = make_req_body(self)
+
+        response = await Chat(self.request_body)
+        return response
+
+
+# OPENAI_API_KEY = os.getenv("OPENAI_API_KEY")
+client = OpenAI(
+    api_key=os.getenv("OPENAI_API_KEY")
+)
+
+encoding = "cl100k_base"  # this the encoding for text-embedding-ada-002
+# tokenizer = tiktoken.get_encoding(encoding)
+
+
+async def ChatBody(params: GPT_Module_Params):
+    try:
+        response = client.chat.completions.create(**params)
+        return response
+    except Exception as e:
+        print(e)
+
+
+async def Chat(params: GPT_Module_Params):
+
+    try:
+        response = client.chat.completions.create(**params)
+        response_message = response.choices[0].message
+        if response_message.tool_calls:
+            print("\n\nfunction call detected.\n\n")
+            return (response_message.tool_calls)
+
+        else:
+            response_text = response.choices[0].message.content
+            return (response_text)
+
+    except Exception as e:
+        print(e)
+
+
+def send_functioncall_args_to_available_functions(response, available_functions):
+
+    return_values = {}
+
+    try:
+        for tool_call in response:
+            print("tool call detected\n", tool_call, "\n")
+            function_name = tool_call.function.name
+            function_to_call = available_functions[function_name]
+            function_args = json.loads(tool_call.function.arguments)
+
+            print(str(function_args))
+
+            if function_args == {}:
+                return_value = function_to_call()
+                return_value = str(return_value)
+                print(return_value)
+            else:
+                return_value = function_to_call(**function_args)
+                return_value = str(return_value)
+                print(return_value)
+
+            return_values[function_name] = {
+                "tool_call_id": tool_call.id,
+                "role": "tool",
+                "name": function_name,
+                "content": return_value,
+            }
+
+        return return_values
+
+    except Exception as e:
+        print(f"\nException: {e}\n")

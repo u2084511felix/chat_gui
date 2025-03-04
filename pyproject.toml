@@ -1,0 +1,19 @@
+[tool.poetry]
+name = "chatgui"
+version = "0.20"
+description = "GUI util for llm chat and structured outputs"
+authors = ["u2084511felix <79988595+u2084511felix@users.noreply.github.com>"]
+readme = "README.md"
+packages = [{include = "utils"}]
+
+[tool.poetry.dependencies]
+#python = "^3.12"
+python = ">=3.12,<3.14"
+openai = "^1.40.2"
+pydantic = "^2.8.2"
+pyside6 = "^6.8.2.1"
+qasync = "^0.27.1"
+
+[build-system]
+requires = ["poetry-core"]
+build-backend = "poetry.core.masonry.api"
