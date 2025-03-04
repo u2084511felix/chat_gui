@@ -52,11 +52,8 @@ I have included my built-in **Schema Generator**, which converts any JSON object
   - `pydantic`
 
 ### **Installation Instructions**
-1. Clone the repository:
-   ```sh
-   git clone https://github.com/your-repo-name.git
-   cd your-repo-name
-   ```
+1. Clone the repository.
+
 2. Install python poetry.
    ```sh
    pipx install poetry
