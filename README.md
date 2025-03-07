@@ -4,6 +4,9 @@
 This is an interface I threw together in march 2023 after the GPT-4 API was released. I wanted more control over the conversation history, and also the ability to import and export projects, as well as switch between models. I came back to it after two years because I wanted to have a way to quickly generate, inspect, review and export useful schemas, and structured outputs. 
 I moved the project to a new GUI framework, and have included a util script for the openai api. 
 
+## Todo:
+- Investigate why complex json objects in the legacy schema generator with multi level of nested objects and arrays are not being returned fully in the output schema.
+
 ## Features
 
 ### 1. **Structured Output Modes**

@@ -12,11 +12,7 @@ from PySide6.QtWidgets import (
 )
 from PySide6.QtCore import Qt
 from qasync import QEventLoop, asyncSlot
-
-# Import your OpenAI configuration and Generate class.
 from utils.models.openai_config import Generate, Models
-# Import legacy functions from your modules.
-from utils.models.modules import generate_legacy_structured_output_schema, legacy_structured_output
 
 
 class ChatbotWindow(QMainWindow):
