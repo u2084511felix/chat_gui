@@ -27,8 +27,13 @@ def save_json_file(data, file_name):
     print(f"File saved to: {file_path}")
 
 
-async def legacy_structured_output(prompt, schema):
-    system_message = "Supply the function variables for the given function according to the instruction."
+async def legacy_structured_output(prompt, schema, system_msg="default"):
+
+    if (system_msg == "default"):
+        system_message = "Supply the function variables for the given function according to the instruction."
+
+    else:
+        system_message = system_msg
 
     LegacyStructuredOutput = Generate()
     new_schema = json.loads(schema)
@@ -47,17 +52,21 @@ async def legacy_structured_output(prompt, schema):
     legacy_structured_output = await LegacyStructuredOutput.function_call_legacy_structured_output(system_message, prompt)
 
     legacy_structured_output = legacy_structured_output[0].function.arguments
-    output_json = json.loads(legacy_structured_output)
-    save_json_file(output_json, "finaloutput.json")
+    # output_json = json.loads(legacy_structured_output)
+    # save_json_file(output_json, "finaloutput.json")
     return legacy_structured_output
 
 
-async def generate_legacy_structured_output_schema(json_object):
+async def generate_legacy_structured_output_schema(json_object, system_msg="default"):
 
     transforn_prompt = "Transform this JSON object: " + str(json_object)
     SchemaGenerator = Generate()
 
-    sys_msg = f"""Generate a JSON schema for the given instruction converting from an existing data outline, using the function."""
+    if (system_msg == "default"):
+        sys_msg = f"""Generate a JSON schema for the given instruction converting from an existing data model outline, using the function."""
+
+    else:
+        sys_msg = system_msg
 
     SchemaGenerator.tools = [
         {
@@ -113,18 +122,22 @@ async def generate_legacy_structured_output_schema(json_object):
     generated_schema = await SchemaGenerator.function_call_legacy_structured_output(sys_msg, transforn_prompt)
 
     generated_schema = generated_schema[0].function.arguments
-    output_json = json.loads(generated_schema)
-    save_json_file(output_json, "schema_output.json")
+    # output_json = json.loads(generated_schema)
+    # save_json_file(output_json, "schema_output.json")
 
     return generated_schema
 
 
-async def generate_structured_output_schema(json_object):
+async def generate_structured_output_schema(json_object, system_msg="default"):
 
     transforn_prompt = "Transform this JSON object: " + str(json_object)
     SchemaGenerator = Generate()
 
-    sys_msg = f"""Generate a JSON schema for the given instruction converting from an existing data outline, using the function."""
+    if (system_msg == "default"):
+        sys_msg = f"""Generate a JSON schema for the given instruction converting from an existing data model outline, using the function."""
+
+    else:
+        sys_msg = system_msg
 
     SchemaGenerator.tools = [
         {
@@ -218,16 +231,25 @@ async def generate_structured_output_schema(json_object):
     generated_schema = await SchemaGenerator.function_call_legacy_structured_output(sys_msg, transforn_prompt)
 
     generated_schema = generated_schema[0].function.arguments
-    output_json = json.loads(generated_schema)
-    save_json_file(output_json, "schema_output.json")
+
+    # output_json = json.loads(generated_schema)
+    # save_json_file(output_json, "schema_output.json")
 
     return generated_schema
 
 
-async def structured_outputs_generator(transforn_prompt, schema):
+async def structured_outputs_generator(transforn_prompt, schema, system_msg="default", params={}):
 
-    module = create_generator_module(max_tokens=2000)
-    sys_msg = f"""Generate a JSON schema for the given content model."""
+    if (system_msg == "default"):
+        sys_msg = f"""Generate a JSON schema for the given content model."""
+    else:
+        sys_msg = system_msg
+
+    if (params is {}):
+        module = create_generator_module(max_tokens=2000)
+
+    else:
+        module = create_generator_module(**params)
 
     response = await module.structured_output(sys_msg, transforn_prompt, schema)
     return response
