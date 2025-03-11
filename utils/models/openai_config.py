@@ -3,6 +3,7 @@ import os
 import json
 from pydantic import BaseModel
 from dataclasses import dataclass, field
+import pprint
 from typing import Optional, Dict, Any
 
 
@@ -143,25 +144,21 @@ class Generate(GPTModule):
     def call_function(self, function_response, available_functions):
         return send_functioncall_args_to_available_functions(function_response, available_functions)
 
-    def ingest_schema(self, name, schema):
-        self.response_format = {
-            "type": "json_schema",
-            "json_schema": {
-                "name": name,
-                "strict": True,
-                "schema": schema
-            }
-        }
-
-    async def structured_output(self, system_message, prompt):
-        # NOTE: Make sure to call ingest_schema before calling this function
+    async def structured_output(self, system_message, prompt, schema):
+        self.max_tokens = 2000
         self.model = TextModels.hipster_latest
         self.messages.append({"role": "system", "content": system_message})
         self.messages.append({"role": "user", "content": prompt})
+        schema = json.loads(schema)
+        self.response_format = {
+            "type": "json_schema",
+            "json_schema": schema
+        }
         self.request_body = make_req_body(self)
-
-        response = await Chat(self.request_body)
-        return response
+        pprint.pprint(self.request_body)
+        response = await ChatBody(self.request_body)
+        pprint.pprint(response)
+        return response.choices[0].message.content
 
 
 # OPENAI_API_KEY = os.getenv("OPENAI_API_KEY")
@@ -171,6 +168,23 @@ client = OpenAI(
 
 encoding = "cl100k_base"  # this the encoding for text-embedding-ada-002
 # tokenizer = tiktoken.get_encoding(encoding)
+
+
+def create_generator_module(**kwargs):
+    """
+    args: (**kwargs)
+    eg:
+
+    some_generator = create_generator_module(
+        temperature=0,
+        model=Models.text.hipster_latest
+    )
+    """
+    module = Generate()
+    for key, value in kwargs.items():
+        setattr(module, key, value)
+
+    return module
 
 
 async def ChatBody(params: GPT_Module_Params):

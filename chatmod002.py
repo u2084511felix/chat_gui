@@ -12,7 +12,16 @@ from PySide6.QtWidgets import (
 )
 from PySide6.QtCore import Qt
 from qasync import QEventLoop, asyncSlot
+
+# Import your OpenAI configuration and Generate class.
 from utils.models.openai_config import Generate, Models
+# Import both the new and legacy structured output functions.
+from utils.models.modules import (
+    generate_legacy_structured_output_schema,
+    legacy_structured_output,
+    generate_structured_output_schema,
+    structured_outputs_generator
+)
 
 
 class ChatbotWindow(QMainWindow):
@@ -183,10 +192,11 @@ class ChatbotWindow(QMainWindow):
         mode_info = QPushButton("?")
         mode_info.setFixedSize(25, 25)
         mode_info.clicked.connect(lambda: self.show_alert("Structured Output Information",
-                                                          "New Mode:\n• Left: Sub-tabs for system message and prompt.\n• Right: Input schema and generated output.\n\nLegacy Mode:\n• Step 1: Generate legacy schema using input schema.\n• Step 2: Generate legacy output using sub-tabs (System Message, Instructions, Function Name)."))
+                                                          "New Mode (2 Steps):\n• Step 1: Generate Schema using the new functions.\n• Step 2: Generate Structured Output using the new functions.\n\nLegacy Mode (2 Steps):\n• Step 1: Generate Legacy Schema.\n• Step 2: Generate Legacy Structured Output."))
         header_layout.addWidget(mode_info)
         self.structured_mode_combo = QComboBox()
-        self.structured_mode_combo.addItem("Structured Output")
+        # First mode is the new (non‑legacy) structured output
+        self.structured_mode_combo.addItem("Structured Output (New)")
         self.structured_mode_combo.addItem("Legacy Structured Output")
         self.structured_mode_combo.currentIndexChanged.connect(
             self.on_structured_mode_changed)
@@ -201,76 +211,174 @@ class ChatbotWindow(QMainWindow):
 
         self.structured_stack = QStackedWidget()
 
-        # New Mode
-        new_mode_page = QWidget()
-        new_layout = QVBoxLayout()
-        splitter_new = QSplitter(Qt.Horizontal)
-        new_left = QTabWidget()
-        new_left.setMinimumWidth(self.width() // 3)
-        system_tab = QWidget()
-        sys_layout = QVBoxLayout()
-        self.new_mode_system = QTextEdit()
-        self.new_mode_system.setPlainText(
-            "Use the provided JSON schema to generate a structured output.")
-        sys_layout.addWidget(self.new_mode_system)
-        system_tab.setLayout(sys_layout)
-        new_left.addTab(system_tab, "System Message")
-        prompt_tab = QWidget()
-        prompt_layout = QVBoxLayout()
-        self.new_mode_prompt = QLineEdit()
-        self.new_mode_prompt.setPlaceholderText(
-            "Enter prompt for structured output...")
-        prompt_layout.addWidget(self.new_mode_prompt)
-        prompt_tab.setLayout(prompt_layout)
-        new_left.addTab(prompt_tab, "Prompt")
-        splitter_new.addWidget(new_left)
-        new_right = QWidget()
-        new_right_layout = QVBoxLayout()
+        # --- New Mode (Non‑Legacy) Structured Output Page (2 Steps) ---
+        nonlegacy_mode_page = QWidget()
+        nonlegacy_layout = QVBoxLayout()
+
+        # Step 1: Schema Generation
+        step1_box = QGroupBox("Step 1: Schema Generation")
+        step1_layout = QVBoxLayout()
+        header1_layout = QHBoxLayout()
+        header1_layout.addWidget(QLabel("Schema Generation"))
+        clear1_btn = QPushButton("Clear")
+        clear1_btn.setFixedSize(60, 25)
+        clear1_btn.clicked.connect(self.clear_nonlegacy_schema_inputs)
+        header1_layout.addStretch()
+        header1_layout.addWidget(clear1_btn)
+        step1_layout.addLayout(header1_layout)
+
+        splitter_schema = QSplitter(Qt.Horizontal)
+        nonlegacy_left = QTabWidget()
+        nonlegacy_left.setMinimumWidth(self.width() // 3)
+        # System Message tab for schema generation
+        schema_sys_tab = QWidget()
+        schema_sys_layout = QVBoxLayout()
+        self.nonlegacy_schema_system = QTextEdit()
+        self.nonlegacy_schema_system.setPlainText(
+            "Generate a JSON schema for the given instruction using the new function.")
+        schema_sys_layout.addWidget(self.nonlegacy_schema_system)
+        schema_sys_tab.setLayout(schema_sys_layout)
+        nonlegacy_left.addTab(schema_sys_tab, "System Message")
+        # Input Schema tab
+        schema_input_tab = QWidget()
+        schema_input_layout = QVBoxLayout()
+        self.nonlegacy_input_schema_edit = QTextEdit()
+        default_schema = {
+            "timestamp": "",
+            "recipe_name": "",
+            "recipe_description": "",
+            "ingredients": "",
+            "cooking_instruction": "",
+            "nutritional_values": {
+                "proteins": "",
+                "fats": "",
+                "carbs": "",
+                "sugar": "",
+                "salt": "",
+                "minerals": "",
+                "nutrients": ""
+            },
+            "portion_size": "",
+            "estimated_calories": ""
+        }
+        self.nonlegacy_input_schema_edit.setPlainText(
+            json.dumps(default_schema, indent=4))
+        schema_input_layout.addWidget(self.nonlegacy_input_schema_edit)
+        schema_input_tab.setLayout(schema_input_layout)
+        nonlegacy_left.addTab(schema_input_tab, "Input Schema")
+        splitter_schema.addWidget(nonlegacy_left)
+
+        nonlegacy_right = QWidget()
+        nonlegacy_right_layout = QVBoxLayout()
         schema_label_layout = QHBoxLayout()
-        schema_label = QLabel("Input Schema:")
+        schema_label = QLabel("Generated Schema:")
         schema_label_layout.addWidget(schema_label)
-        schema_info = QPushButton("?")
-        schema_info.setFixedSize(25, 25)
-        schema_info.clicked.connect(lambda: self.show_alert("Input Schema",
-                                                            "Enter a valid JSON schema that defines the expected structure of the output."))
-        schema_label_layout.addWidget(schema_info)
-        new_right_layout.addLayout(schema_label_layout)
-        self.new_schema_edit = QTextEdit()
-        self.new_schema_edit.setPlaceholderText(
-            "Enter JSON schema for structured output...")
-        new_right_layout.addWidget(self.new_schema_edit)
-        action_layout = QHBoxLayout()
-        self.new_generate_btn = QPushButton("Generate Structured Output")
-        self.new_generate_btn.clicked.connect(self.on_generate_structured_new)
-        action_layout.addWidget(self.new_generate_btn)
-        new_copy_btn = QPushButton("Copy Output")
-        new_copy_btn.clicked.connect(lambda: self.copy_to_clipboard(
-            self.new_structured_output_view.toPlainText()))
-        action_layout.addWidget(new_copy_btn)
-        new_export_btn = QPushButton("Export Structured Output")
-        new_export_btn.clicked.connect(lambda: self.export_to_folder(self.new_structured_output_view.toPlainText(),
-                                                                     "StructuredOutputs", "structured_output"))
-        action_layout.addWidget(new_export_btn)
-        new_right_layout.addLayout(action_layout)
+        schema_info_btn = QPushButton("?")
+        schema_info_btn.setFixedSize(25, 25)
+        schema_info_btn.clicked.connect(lambda: self.show_alert(
+            "Schema Info", "The generated JSON schema will be displayed here."))
+        schema_label_layout.addWidget(schema_info_btn)
+        nonlegacy_right_layout.addLayout(schema_label_layout)
+        self.nonlegacy_schema_edit = QTextEdit()
+        self.nonlegacy_schema_edit.setReadOnly(True)
+        nonlegacy_right_layout.addWidget(self.nonlegacy_schema_edit)
+        schema_action_layout = QHBoxLayout()
+        self.nonlegacy_generate_schema_btn = QPushButton("Generate Schema")
+        self.nonlegacy_generate_schema_btn.clicked.connect(
+            self.on_generate_nonlegacy_schema)
+        schema_action_layout.addWidget(self.nonlegacy_generate_schema_btn)
+        schema_copy_btn = QPushButton("Copy Schema")
+        schema_copy_btn.clicked.connect(lambda: self.copy_to_clipboard(
+            self.nonlegacy_schema_edit.toPlainText()))
+        schema_action_layout.addWidget(schema_copy_btn)
+        schema_export_btn = QPushButton("Export Schema")
+        schema_export_btn.clicked.connect(lambda: self.export_to_folder(self.nonlegacy_schema_edit.toPlainText(),
+                                                                        "GeneratedSchemas", "nonlegacy_schema"))
+        schema_action_layout.addWidget(schema_export_btn)
+
+        schema_import = QPushButton("Import Schema")
+        schema_import.clicked.connect(self.on_import_schema)
+        schema_action_layout.addWidget(schema_import)
+
+        nonlegacy_right_layout.addLayout(schema_action_layout)
+        nonlegacy_right.setLayout(nonlegacy_right_layout)
+        splitter_schema.addWidget(nonlegacy_right)
+        step1_layout.addWidget(splitter_schema)
+        step1_box.setLayout(step1_layout)
+        nonlegacy_layout.addWidget(step1_box)
+
+        # Step 2: Structured Output Generation
+        step2_box = QGroupBox("Step 2: Structured Output Generation")
+        step2_layout = QVBoxLayout()
+        header2_layout = QHBoxLayout()
+        header2_layout.addWidget(QLabel("Structured Output Generation"))
+        clear2_btn = QPushButton("Clear")
+        clear2_btn.setFixedSize(60, 25)
+        clear2_btn.clicked.connect(self.clear_nonlegacy_output_inputs)
+        header2_layout.addStretch()
+        header2_layout.addWidget(clear2_btn)
+        step2_layout.addLayout(header2_layout)
+
+        splitter_output = QSplitter(Qt.Horizontal)
+        nonlegacy_output_left = QTabWidget()
+        nonlegacy_output_left.setMinimumWidth(self.width() // 3)
+        # System Message tab for output generation
+        output_sys_tab = QWidget()
+        output_sys_layout = QVBoxLayout()
+        self.nonlegacy_output_system = QTextEdit()
+        self.nonlegacy_output_system.setPlainText(
+            "Provide any additional instructions for structured output generation using the new function.")
+        output_sys_layout.addWidget(self.nonlegacy_output_system)
+        output_sys_tab.setLayout(output_sys_layout)
+        nonlegacy_output_left.addTab(output_sys_tab, "System Message")
+        # Instructions tab
+        output_prompt_tab = QWidget()
+        output_prompt_layout = QVBoxLayout()
+        self.nonlegacy_prompt_edit = QLineEdit()
+        self.nonlegacy_prompt_edit.setPlaceholderText(
+            "Enter prompt for structured output generation...")
+        output_prompt_layout.addWidget(self.nonlegacy_prompt_edit)
+        output_prompt_tab.setLayout(output_prompt_layout)
+        nonlegacy_output_left.addTab(output_prompt_tab, "Instructions")
+        splitter_output.addWidget(nonlegacy_output_left)
+
+        nonlegacy_output_right = QWidget()
+        nonlegacy_output_right_layout = QVBoxLayout()
         output_label_layout = QHBoxLayout()
         output_label = QLabel("Structured Output:")
         output_label_layout.addWidget(output_label)
-        output_info = QPushButton("?")
-        output_info.setFixedSize(25, 25)
-        output_info.clicked.connect(lambda: self.show_alert("Structured Output",
-                                                            "The generated JSON output will appear here, formatted for readability."))
-        output_label_layout.addWidget(output_info)
-        new_right_layout.addLayout(output_label_layout)
-        self.new_structured_output_view = QTextEdit()
-        self.new_structured_output_view.setReadOnly(True)
-        new_right_layout.addWidget(self.new_structured_output_view)
-        new_right.setLayout(new_right_layout)
-        splitter_new.addWidget(new_right)
-        new_layout.addWidget(splitter_new)
-        new_mode_page.setLayout(new_layout)
-        self.structured_stack.addWidget(new_mode_page)
+        output_info_btn = QPushButton("?")
+        output_info_btn.setFixedSize(25, 25)
+        output_info_btn.clicked.connect(lambda: self.show_alert(
+            "Output Info", "The generated structured output will be displayed here."))
+        output_label_layout.addWidget(output_info_btn)
+        nonlegacy_output_right_layout.addLayout(output_label_layout)
+        self.nonlegacy_output_view = QTextEdit()
+        self.nonlegacy_output_view.setReadOnly(True)
+        nonlegacy_output_right_layout.addWidget(self.nonlegacy_output_view)
+        output_action_layout = QHBoxLayout()
+        self.nonlegacy_generate_output_btn = QPushButton("Generate Output")
+        self.nonlegacy_generate_output_btn.clicked.connect(
+            self.on_generate_nonlegacy_output)
+        output_action_layout.addWidget(self.nonlegacy_generate_output_btn)
+        output_copy_btn = QPushButton("Copy Output")
+        output_copy_btn.clicked.connect(lambda: self.copy_to_clipboard(
+            self.nonlegacy_output_view.toPlainText()))
+        output_action_layout.addWidget(output_copy_btn)
+        output_export_btn = QPushButton("Export Output")
+        output_export_btn.clicked.connect(lambda: self.export_to_folder(self.nonlegacy_output_view.toPlainText(),
+                                                                        "StructuredOutputs", "nonlegacy_structured_output"))
+        output_action_layout.addWidget(output_export_btn)
+        nonlegacy_output_right_layout.addLayout(output_action_layout)
+        nonlegacy_output_right.setLayout(nonlegacy_output_right_layout)
+        splitter_output.addWidget(nonlegacy_output_right)
+        step2_layout.addWidget(splitter_output)
+        step2_box.setLayout(step2_layout)
+        nonlegacy_layout.addWidget(step2_box)
+        nonlegacy_mode_page.setLayout(nonlegacy_layout)
+        self.structured_stack.addWidget(nonlegacy_mode_page)
 
-        # Legacy Mode
+        # --- Legacy Mode Structured Output Page (Unchanged) ---
         legacy_mode_page = QWidget()
         legacy_layout = QVBoxLayout()
 
@@ -330,8 +438,8 @@ class ChatbotWindow(QMainWindow):
         legacy_schema_label_layout.addWidget(legacy_schema_label)
         legacy_schema_info = QPushButton("?")
         legacy_schema_info.setFixedSize(25, 25)
-        legacy_schema_info.clicked.connect(lambda: self.show_alert("Legacy Schema",
-                                                                   "After clicking 'Generate Legacy Schema', the generated legacy schema will be displayed here in a pretty‑printed JSON format."))
+        legacy_schema_info.clicked.connect(lambda: self.show_alert(
+            "Legacy Schema", "After clicking 'Generate Legacy Schema', the generated legacy schema will be displayed here in a pretty‑printed JSON format."))
         legacy_schema_label_layout.addWidget(legacy_schema_info)
         legacy_right_layout.addLayout(legacy_schema_label_layout)
         self.legacy_schema_edit = QTextEdit()
@@ -347,11 +455,11 @@ class ChatbotWindow(QMainWindow):
             lambda: self.copy_to_clipboard(self.legacy_schema_edit.toPlainText()))
         legacy_schema_action_layout.addWidget(legacy_schema_copy)
         legacy_schema_export = QPushButton("Export Schema")
-        legacy_schema_export.clicked.connect(lambda: self.export_to_folder(self.legacy_schema_edit.toPlainText(),
-                                                                           "GeneratedSchemas", "legacy_schema"))
+        legacy_schema_export.clicked.connect(lambda: self.export_to_folder(
+            self.legacy_schema_edit.toPlainText(), "GeneratedSchemas", "legacy_schema"))
         legacy_schema_action_layout.addWidget(legacy_schema_export)
         legacy_schema_import = QPushButton("Import Schema")
-        legacy_schema_import.clicked.connect(self.on_import_schema)
+        legacy_schema_import.clicked.connect(self.on_legacy_import_schema)
         legacy_schema_action_layout.addWidget(legacy_schema_import)
         legacy_right_layout.addLayout(legacy_schema_action_layout)
         legacy_right.setLayout(legacy_right_layout)
@@ -360,7 +468,7 @@ class ChatbotWindow(QMainWindow):
         step1_box.setLayout(step1_layout)
         legacy_layout.addWidget(step1_box)
 
-        # Step 2: Legacy Output Generation
+        # Step 2: Legacy Structured Output Generation
         step2_box = QGroupBox("Step 2: Legacy Structured Output Generation")
         step2_layout = QVBoxLayout()
         header2_layout = QHBoxLayout()
@@ -372,7 +480,6 @@ class ChatbotWindow(QMainWindow):
         header2_layout.addWidget(clear2_btn)
         step2_layout.addLayout(header2_layout)
         splitter_legacy_output = QSplitter(Qt.Horizontal)
-        # Left: Sub-tabs for legacy output generation: System Message, Instructions, Function Name
         legacy_output_left = QTabWidget()
         legacy_output_left.setMinimumWidth(self.width() // 3)
         legacy_output_sys_tab = QWidget()
@@ -391,9 +498,7 @@ class ChatbotWindow(QMainWindow):
         legacy_prompt_layout.addWidget(self.legacy_prompt_edit)
         legacy_prompt_tab.setLayout(legacy_prompt_layout)
         legacy_output_left.addTab(legacy_prompt_tab, "Instructions")
-
         splitter_legacy_output.addWidget(legacy_output_left)
-        # Right: Legacy Output view and actions
         legacy_output_right = QWidget()
         legacy_output_right_layout = QVBoxLayout()
         legacy_output_label_layout = QHBoxLayout()
@@ -401,8 +506,8 @@ class ChatbotWindow(QMainWindow):
         legacy_output_label_layout.addWidget(legacy_output_label)
         legacy_output_info = QPushButton("?")
         legacy_output_info.setFixedSize(25, 25)
-        legacy_output_info.clicked.connect(lambda: self.show_alert("Structured Output",
-                                                                   "The generated structured output will appear here, formatted for readability."))
+        legacy_output_info.clicked.connect(lambda: self.show_alert(
+            "Structured Output", "The generated structured output will appear here, formatted for readability."))
         legacy_output_label_layout.addWidget(legacy_output_info)
         legacy_output_right_layout.addLayout(legacy_output_label_layout)
         self.legacy_output_view = QTextEdit()
@@ -418,8 +523,8 @@ class ChatbotWindow(QMainWindow):
             lambda: self.copy_to_clipboard(self.legacy_output_view.toPlainText()))
         legacy_output_action_layout.addWidget(legacy_output_copy)
         legacy_output_export = QPushButton("Export Output")
-        legacy_output_export.clicked.connect(lambda: self.export_to_folder(self.legacy_output_view.toPlainText(),
-                                                                           "StructuredOutputs", "legacy_structured_output"))
+        legacy_output_export.clicked.connect(lambda: self.export_to_folder(
+            self.legacy_output_view.toPlainText(), "StructuredOutputs", "legacy_structured_output"))
         legacy_output_action_layout.addWidget(legacy_output_export)
         legacy_output_right_layout.addLayout(legacy_output_action_layout)
         legacy_output_right.setLayout(legacy_output_right_layout)
@@ -434,55 +539,32 @@ class ChatbotWindow(QMainWindow):
         struct_tab.setLayout(main_layout)
         self.main_tab.addTab(struct_tab, "Structured Output")
 
-    # --- Utility Methods ---
-    def update_history_combo(self):
-        self.history_combo.clear()
-        for i, msg in enumerate(self.gen_instance.messages):
-            role = msg.get('role', 'unknown')
-            self.history_combo.addItem(f"{i}: {role}", i)
+    # --- Clear Methods for Structured Output ---
+    def clear_nonlegacy_schema_inputs(self):
+        self.nonlegacy_input_schema_edit.clear()
+        self.nonlegacy_schema_edit.clear()
 
-    def show_alert(self, title, message):
-        QMessageBox.information(self, title, message)
+    def clear_nonlegacy_output_inputs(self):
+        self.nonlegacy_prompt_edit.clear()
+        self.nonlegacy_output_view.clear()
 
-    def copy_to_clipboard(self, text):
-        QApplication.clipboard().setText(text)
-        self.show_alert("Copied", "Content copied to clipboard.")
+    def clear_legacy_schema_inputs(self):
+        self.legacy_input_schema_edit.clear()
+        self.legacy_schema_edit.clear()
 
-    def export_to_folder(self, text, folder_name, prefix):
-        if not text:
-            self.show_alert("Export Error", "There is no content to export.")
-            return
-        folder_path = os.path.join(os.getcwd(), folder_name)
-        os.makedirs(folder_path, exist_ok=True)
-        timestamp = datetime.datetime.now().strftime("%Y%m%d_%H%M%S")
-        filename = f"{prefix}_{timestamp}.json"
-        file_path = os.path.join(folder_path, filename)
-        try:
-            with open(file_path, "w") as f:
-                try:
-                    parsed = json.loads(text)
-                    json.dump(parsed, f, indent=4)
-                except Exception:
-                    f.write(text)
-            self.show_alert("Export Successful", f"File saved to: {file_path}")
-        except Exception as e:
-            self.show_alert("Export Error", str(e))
+    def clear_legacy_output_inputs(self):
+        self.legacy_prompt_edit.clear()
+        self.legacy_output_view.clear()
 
-    def on_import_schema(self):
-        folder_path = os.path.join(os.getcwd(), "GeneratedSchemas")
-        os.makedirs(folder_path, exist_ok=True)
-        filename, _ = QFileDialog.getOpenFileName(
-            self, "Import Schema", folder_path, "JSON Files (*.json)")
-        if filename:
-            try:
-                with open(filename, "r") as f:
-                    schema = json.load(f)
-                self.legacy_schema_edit.setPlainText(
-                    json.dumps(schema, indent=4))
-                self.show_alert("Import Successful",
-                                "Schema imported successfully.")
-            except Exception as e:
-                self.show_alert("Import Error", str(e))
+    # New method to clear structured inputs based on current mode
+    def clear_structured_inputs(self):
+        current_index = self.structured_mode_combo.currentIndex()
+        if current_index == 0:  # New (Non‑Legacy) Mode
+            self.clear_nonlegacy_schema_inputs()
+            self.clear_nonlegacy_output_inputs()
+        elif current_index == 1:  # Legacy Mode
+            self.clear_legacy_schema_inputs()
+            self.clear_legacy_output_inputs()
 
     # --- Chat Methods ---
     @asyncSlot()
@@ -518,7 +600,6 @@ class ChatbotWindow(QMainWindow):
                 temperature=self.gen_instance.temperature, chat=False
             )
             loading.close()
-
         except Exception as e:
             response_obj = {"choices": [
                 {"message": {"content": f"Error: {e}"}}], "usage": {"total_tokens": "N/A"}}
@@ -617,41 +698,72 @@ class ChatbotWindow(QMainWindow):
         QApplication.processEvents()
         return dlg
 
-    # --- Structured Output: New Mode ---
+    # --- Structured Output: New (Non‑Legacy) Mode Methods ---
     @asyncSlot()
-    async def on_generate_structured_new(self):
-        system_message = self.new_mode_system.toPlainText().strip()
-        prompt = self.new_mode_prompt.text().strip()
-        if not prompt:
+    async def on_generate_nonlegacy_schema(self):
+        input_schema_text = self.nonlegacy_input_schema_edit.toPlainText().strip()
+        if not input_schema_text:
             self.show_alert("Validation Error",
-                            "Prompt for structured output is required!")
-            return
-        schema_text = self.new_schema_edit.toPlainText().strip()
-        if not schema_text:
-            self.show_alert("Validation Error",
-                            "Input schema is required for structured output!")
+                            "Input schema is required for schema generation!")
             return
         try:
-            schema = json.loads(schema_text)
+            input_schema = json.loads(input_schema_text)
         except Exception as e:
-            self.show_alert("Validation Error", f"Invalid JSON schema: {e}")
+            self.show_alert("Validation Error",
+                            f"Invalid input schema JSON: {e}")
             return
-        self.gen_instance.ingest_schema("structured_output", schema)
-        loading = self.show_loading_dialog("Generating output", "please wait")
+
+        loading = self.show_loading_dialog("Generating schema", "please wait")
         try:
-            response = await self.gen_instance.structured_output(system_message, prompt)
+            generated_schema = await generate_structured_output_schema(input_schema)
         except Exception as e:
-            response = f"Error: {e}"
+            self.show_alert("Error", f"Schema generation failed: {e}")
+            loading.close()
+            return
         loading.close()
         try:
-            parsed_response = json.loads(response)
-            formatted_json = json.dumps(parsed_response, indent=4)
+            parsed = json.loads(generated_schema)
+            formatted = json.dumps(parsed, indent=4)
         except Exception:
-            formatted_json = response
-        self.new_structured_output_view.setPlainText(formatted_json)
-        self.update_history_combo()
+            formatted = generated_schema
+        self.nonlegacy_schema_edit.setPlainText(formatted)
 
-    # --- Structured Output: Legacy Mode ---
+    @asyncSlot()
+    async def on_generate_nonlegacy_output(self):
+        prompt = self.nonlegacy_prompt_edit.text().strip()
+        if not prompt:
+            self.show_alert(
+                "Validation Error", "Prompt is required for structured output generation!")
+            return
+        schema_text = self.nonlegacy_schema_edit.toPlainText().strip()
+        if not schema_text:
+            self.show_alert(
+                "Validation Error", "Generated schema is required! Please generate schema first.")
+            return
+        try:
+            schema_json = json.loads(schema_text)
+        except Exception as e:
+            self.show_alert("Validation Error", f"Invalid schema JSON: {e}")
+            return
+
+        loading = self.show_loading_dialog(
+            "Generating structured output", "please wait")
+        try:
+            nonlegacy_output = await structured_outputs_generator(prompt, schema_text)
+            if nonlegacy_output is None:
+                raise Exception(
+                    "No output received from structured_outputs_generator.")
+        except Exception as e:
+            nonlegacy_output = f"Error: {e}"
+        loading.close()
+        try:
+            parsed_output = json.loads(nonlegacy_output)
+            formatted_output = json.dumps(parsed_output, indent=4)
+        except Exception:
+            formatted_output = nonlegacy_output
+        self.nonlegacy_output_view.setPlainText(formatted_output)
+
+    # --- Structured Output: Legacy Mode Methods ---
     @asyncSlot()
     async def on_generate_legacy_schema(self):
         input_schema_text = self.legacy_input_schema_edit.toPlainText().strip()
@@ -666,71 +778,9 @@ class ChatbotWindow(QMainWindow):
                             f"Invalid input schema JSON: {e}")
             return
 
-        transforn_prompt = "Transform this JSON object: " + \
-            str(input_schema_text)
-        SchemaGenerator = Generate()
-
-        legacy_schema_system = self.legacy_schema_system.toPlainText().strip()
-        if not legacy_schema_system:
-            self.show_alert(
-                "Validation Error", "System message is required for schema generation!")
-            return
-
-        SchemaGenerator.tools = [
-            {
-                "type": "function",
-                "function": {
-                    "name": "Tool_Schema",
-                    "description": "Schema for generating tool schemas. Do not use $ref in the schema. Use the 'type' and 'properties' fields to define the schema. The name property must be single word which matches the pattern: '^[a-zA-Z0-9_-]+$'",
-                    "parameters": {
-                        "type": "object",
-                        "properties": {
-                            "name": {
-                                "type": "string"
-                            },
-                            "description": {
-                                "type": "string"
-                            },
-                            "parameters": {
-                                "oneOf": [
-                                    {
-                                        "type": "object",
-                                        "properties": {
-                                            "type": {
-                                                "type": "string"
-                                            },
-                                            "properties": {
-                                                "type": "object",
-                                                "enum": [],
-                                                "additionalProperties": False
-                                            },
-                                            "required": {
-                                                "type": "array",
-                                                "items": {
-                                                    "type": "string"
-                                                }
-                                            }
-                                        },
-                                        "required": ["type", "properties", "required"],
-                                        "additionalProperties": False
-                                    }
-                                ]
-                            }
-                        },
-                        "required": ["name", "description", "parameters"]
-                    }
-                }
-            }
-        ]
-
-        SchemaGenerator.tool_choice = {
-            "type": "function", "function": {"name": "Tool_Schema"}}
-
         loading = self.show_loading_dialog("Generating output", "please wait")
         try:
-            generated_schema = await SchemaGenerator.function_call_legacy_structured_output(legacy_schema_system, transforn_prompt)
-            generated_schema = generated_schema[0].function.arguments
-
+            generated_schema = await generate_legacy_structured_output_schema(input_schema)
         except Exception as e:
             self.show_alert("Error", f"Legacy schema generation failed: {e}")
             loading.close()
@@ -762,40 +812,15 @@ class ChatbotWindow(QMainWindow):
                             "Input schema is required! Generate it first.")
             return
         try:
-            legacy_schema = json.loads(schema_text)
+            _ = json.loads(schema_text)
         except Exception as e:
             self.show_alert("Validation Error",
                             f"Invalid legacy schema JSON: {e}")
             return
 
-        system_message = self.legacy_output_system.toPlainText().strip()
-        if not system_message:
-            self.show_alert("Validation Error",
-                            "Output System message is required!")
-            return
-
         loading = self.show_loading_dialog("Generating output", "please wait")
-
-        function_name = legacy_schema["name"]
-        function_name = function_name.strip()
-
         try:
-
-            LegacyStructuredOutput = Generate()
-
-            LegacyStructuredOutput.tools = [
-                {
-                    "type": "function",
-                    "function": legacy_schema
-                }
-            ]
-
-            LegacyStructuredOutput.tool_choice = {
-                "type": "function", "function": {"name": function_name}}
-
-            legacy_output = await LegacyStructuredOutput.function_call_legacy_structured_output(system_message, prompt)
-            legacy_output = legacy_output[0].function.arguments
-
+            legacy_output = await legacy_structured_output(prompt, schema_text)
             if legacy_output is None:
                 raise Exception(
                     "No output received from legacy_structured_output.")
@@ -808,43 +833,73 @@ class ChatbotWindow(QMainWindow):
         except Exception:
             formatted_output = legacy_output
         self.legacy_output_view.setPlainText(formatted_output)
-        self.update_history_combo()
 
-    # --- Clear Buttons for Structured Output ---
-    def clear_structured_inputs(self):
-        current_index = self.structured_mode_combo.currentIndex()
-        if current_index == 0:  # New Mode
-            self.new_mode_prompt.clear()
-            self.new_schema_edit.clear()
-            self.new_structured_output_view.clear()
-        elif current_index == 1:  # Legacy Mode
-            self.clear_legacy_schema_inputs()
-            self.clear_legacy_output_inputs()
-
-    def clear_legacy_schema_inputs(self):
-        self.legacy_input_schema_edit.clear()
-        self.legacy_schema_edit.clear()
-
-    def clear_legacy_output_inputs(self):
-        self.legacy_prompt_edit.clear()
-        self.legacy_output_view.clear()
+    def on_structured_mode_changed(self, index):
+        self.structured_stack.setCurrentIndex(index)
 
     # --- Additional Methods ---
     def on_temp_slider_changed(self, value):
         temp_value = value / 100.0
         self.temp_value_label.setText(f"{temp_value:.2f}")
 
-    def on_structured_mode_changed(self, index):
-        self.structured_stack.setCurrentIndex(index)
+    def show_alert(self, title, message):
+        QMessageBox.information(self, title, message)
 
-    def on_save_output_edit(self):
-        index = self.history_combo.currentIndex()
-        if 0 <= index < len(self.gen_instance.messages):
-            new_content = self.chat_output.toPlainText()
-            self.gen_instance.messages[index]["content"] = new_content
-            self.show_alert("Saved", "Message updated successfully.")
-        else:
-            self.show_alert("Error", "No message selected to save.")
+    def copy_to_clipboard(self, text):
+        QApplication.clipboard().setText(text)
+        self.show_alert("Copied", "Content copied to clipboard.")
+
+    def export_to_folder(self, text, folder_name, prefix):
+        if not text:
+            self.show_alert("Export Error", "There is no content to export.")
+            return
+        folder_path = os.path.join(os.getcwd(), folder_name)
+        os.makedirs(folder_path, exist_ok=True)
+        timestamp = datetime.datetime.now().strftime("%Y%m%d_%H%M%S")
+        filename = f"{prefix}_{timestamp}.json"
+        file_path = os.path.join(folder_path, filename)
+        try:
+            with open(file_path, "w") as f:
+                try:
+                    parsed = json.loads(text)
+                    json.dump(parsed, f, indent=4)
+                except Exception:
+                    f.write(text)
+            self.show_alert("Export Successful", f"File saved to: {file_path}")
+        except Exception as e:
+            self.show_alert("Export Error", str(e))
+
+    def on_import_schema(self, schema_type):
+        folder_path = os.path.join(os.getcwd(), "GeneratedSchemas")
+        os.makedirs(folder_path, exist_ok=True)
+        filename, _ = QFileDialog.getOpenFileName(
+            self, "Import Schema", folder_path, "JSON Files (*.json)")
+        if filename:
+            try:
+                with open(filename, "r") as f:
+                    schema = json.load(f)
+                    self.nonlegacy_schema_edit.setPlainText(
+                        json.dumps(schema, indent=4))
+                self.show_alert("Import Successful",
+                                "Schema imported successfully.")
+            except Exception as e:
+                self.show_alert("Import Error", str(e))
+
+    def on_legacy_import_schema(self, schema_type):
+        folder_path = os.path.join(os.getcwd(), "GeneratedSchemas")
+        os.makedirs(folder_path, exist_ok=True)
+        filename, _ = QFileDialog.getOpenFileName(
+            self, "Import Schema", folder_path, "JSON Files (*.json)")
+        if filename:
+            try:
+                with open(filename, "r") as f:
+                    schema = json.load(f)
+                    self.legacy_schema_edit.setPlainText(
+                        json.dumps(schema, indent=4))
+                self.show_alert("Import Successful",
+                                "Schema imported successfully.")
+            except Exception as e:
+                self.show_alert("Import Error", str(e))
 
 
 def main():

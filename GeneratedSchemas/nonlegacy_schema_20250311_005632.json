@@ -1,0 +1,78 @@
+{
+    "name": "Recipe",
+    "description": "A schema for recipe information including ingredients, cooking instructions, and nutritional values.",
+    "schema": {
+        "type": "object",
+        "properties": {
+            "timestamp": {
+                "type": "string",
+                "format": "date-time"
+            },
+            "recipe_name": {
+                "type": "string"
+            },
+            "recipe_description": {
+                "type": "string"
+            },
+            "ingredients": {
+                "type": "string"
+            },
+            "cooking_instruction": {
+                "type": "string"
+            },
+            "nutritional_values": {
+                "type": "object",
+                "properties": {
+                    "proteins": {
+                        "type": "string"
+                    },
+                    "fats": {
+                        "type": "string"
+                    },
+                    "carbs": {
+                        "type": "string"
+                    },
+                    "sugar": {
+                        "type": "string"
+                    },
+                    "salt": {
+                        "type": "string"
+                    },
+                    "minerals": {
+                        "type": "string"
+                    },
+                    "nutrients": {
+                        "type": "string"
+                    }
+                },
+                "required": [
+                    "proteins",
+                    "fats",
+                    "carbs",
+                    "sugar",
+                    "salt",
+                    "minerals",
+                    "nutrients"
+                ],
+                "additionalProperties": false
+            },
+            "portion_size": {
+                "type": "string"
+            },
+            "estimated_calories": {
+                "type": "string"
+            }
+        },
+        "required": [
+            "timestamp",
+            "recipe_name",
+            "recipe_description",
+            "ingredients",
+            "cooking_instruction",
+            "nutritional_values",
+            "portion_size",
+            "estimated_calories"
+        ],
+        "additionalProperties": false
+    }
+}

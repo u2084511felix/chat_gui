@@ -1,0 +1,18 @@
+{
+    "timestamp": "2023-10-05T08:00:00Z",
+    "recipe_name": "Avocado Toast with Poached Egg",
+    "recipe_description": "A simple yet nutritious breakfast option that combines the healthy fats of avocado with the protein of eggs, served on whole-grain bread.",
+    "ingredients": "- 1 ripe avocado\n- 2 slices of whole-grain bread\n- 2 large eggs\n- Salt and pepper to taste\n- Optional: a pinch of red pepper flakes or a dash of hot sauce\n- Optional: a squeeze of lemon juice",
+    "cooking_instruction": "1. Toast the slices of whole-grain bread until golden brown.\n2. Cut the avocado in half, remove the pit, and scoop the flesh into a bowl. Mash it with a fork and season with salt, pepper, and optional lemon juice.\n3. Spread the mashed avocado evenly over the toasted bread slices.\n4. Bring a pot of water to a gentle simmer. Crack each egg into a small bowl, then gently slide them into the simmering water. Poach for about 3-4 minutes until the whites are set but the yolks are still runny.\n5. Remove the eggs with a slotted spoon and place one on top of each avocado toast.\n6. Season with additional salt, pepper, and optional red pepper flakes or hot sauce.\n7. Serve immediately.",
+    "nutritional_values": {
+        "proteins": "12g",
+        "fats": "22g",
+        "carbs": "28g",
+        "sugar": "2g",
+        "salt": "0.5g",
+        "minerals": "Iron, Calcium",
+        "nutrients": "Vitamin A, Vitamin C, Vitamin E, Vitamin K"
+    },
+    "portion_size": "1 serving",
+    "estimated_calories": "350 kcal"
+}

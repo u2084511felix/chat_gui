@@ -1,0 +1,18 @@
+{
+    "timestamp": "2023-12-01T00:00:00Z",
+    "name": "Oatmeal with Fresh Fruits and Nuts",
+    "description": "A hearty and nutritious breakfast option that combines the wholesomeness of oats with the freshness of seasonal fruits and the crunchiness of nuts. This meal is packed with fiber, vitamins, and minerals to kickstart your day.",
+    "ingredients": "1 cup rolled oats, 2 cups water or milk, 1/2 teaspoon cinnamon, 1 tablespoon honey or maple syrup, 1/4 cup mixed nuts (almonds, walnuts, pecans), chopped, 1/2 cup fresh fruits (berries, banana slices, apple chunks), pinch of salt",
+    "cooking_instruction": "1. In a medium saucepan, bring water or milk to a boil. Add oats and a pinch of salt, then reduce heat to simmer. Cook for 5 minutes, stirring occasionally. 2. While oats are cooking, chop nuts and prepare fresh fruits. 3. Once oats are cooked, remove from heat and stir in cinnamon and honey or maple syrup. 4. Serve hot, topped with chopped nuts and fresh fruits.",
+    "nutritional_values": {
+        "proteins": "10g",
+        "fats": "15g",
+        "carbs": "55g",
+        "sugar": "20g",
+        "salt": "0.2g",
+        "minerals": "Calcium, Iron, Magnesium",
+        "nutrients": "Fiber, Antioxidants, Omega-3 fatty acids"
+    },
+    "portion_size": "1 serving",
+    "estimated_calories": "350"
+}
